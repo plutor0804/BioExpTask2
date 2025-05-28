@@ -1,0 +1,74 @@
+#Requires AutoHotkey v2.0
+EEGWin := "Biopac Student Lab"
+sourcefile := "C:\User\User\Desktop\G2\data.txt"
+targetfile := "\\laptop\bci\data.txt"
+TXTWin := "data.txt"
+
+SetTimer(DoEEGProcess, 20000) ; 每 20000 毫秒（20 秒）執行一次
+
+DoEEGProcess() {
+    global EEGWin, sourcefile, targetfile, TXTWin
+    try {
+        if !WinExist("ahk_exe notepad.exe")
+            DetectHiddenWindows True
+
+        ; 切換到 EEG 軟體視窗
+        if !WinActivate(EEGWin) {
+            throw Error("找不到 EEG 軟體視窗: " EEGWin)
+        }
+
+        Sleep 500
+        Send("^Space") ; 開始錄製
+        Sleep 20000
+        Send("^Space") ; 停止錄製
+
+        Sleep 500
+        Send("^a")      ; 全選
+        Sleep 300
+        Send("^l")      ; 複製
+        Sleep 1000
+
+        ; 確保剪貼簿有內容
+        if Clipboard = "" {
+            throw Error("剪貼簿為空，可能複製失敗")
+        }
+
+        ; 開啟記事本
+        Run "notepad.exe " sourcefile
+        if !WinWaitActive(TXTWin, , 5) {
+            throw Error("無法開啟記事本或找不到資料檔視窗: " TXTWin)
+        }
+
+        Sleep 500
+        Send("^a")
+        Send("{Del}")
+        Sleep 200
+        Send("^v")
+        Sleep 300
+        Send("^s")
+        Sleep 500
+        WinClose(TXTWin)
+
+        ; 複製到目標資料夾
+        shellCmd := 'powershell -Command "Copy-Item -Path ''' sourcefile ''' -Destination ''' targetfile ''' -Force"'
+        RunWait shellCmd, , "Hide"
+
+        if !FileExist(targetfile) {
+            throw Error("PowerShell 複製失敗，找不到目標檔案: " targetfile)
+        }
+
+        ; 返回 EEG 軟體並清除波形
+        if !WinActivate(EEGWin) {
+            throw Error("無法回到 EEG 軟體視窗以清除波形")
+        }
+        Sleep 500
+        Send("^a")
+        Sleep 200
+        Send("^x") ; 清除資料
+
+        TrayTip "EEG 自動錄製", "✅ EEG 資料已完成並清空", 3
+    }
+    catch e {
+        TrayTip "⚠️ EEG 自動流程錯誤", e.Message, 5
+    }
+}

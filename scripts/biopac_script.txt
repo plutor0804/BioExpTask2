@@ -1,0 +1,55 @@
+#Requires AutoHotkey v2.0
+; ========== 使用者可依需求調整的參數 ==========
+EEGWin     := "Biopac Student Lab"                        ; Biopac 視窗標題
+TargetFile := "\\LAPTOP-Amy\BIOPAC\data\data.txt"     ; UNC 路徑（雙反斜線）
+TxtTitle   := "data.txt"                                   ; Notepad 標題只填檔名即可
+RecordSec  := 20                                           ; 錄製秒數
+; ===============================================
+
+^F9::{  ; Ctrl + F9 觸發
+    try {
+        ; ---------- 1) 切到 Biopac 並點中央 ----------
+        DetectHiddenWindows(True)
+        if !WinActivate(EEGWin)
+            throw Error("找不到 EEG 軟體視窗: " EEGWin)
+        WinWaitActive(EEGWin,,3)
+        Sleep 200
+
+        CoordMode("Mouse", "Window")            ; 以視窗座標為基準
+        WinGetPos(&x,&y,&w,&h, EEGWin)
+        MouseClick("Left", x + w/2, y + h/2, 1, 0) ; 點視窗中央
+        Sleep 150
+
+        ; ---------- 2) 開始錄製 → 停止錄製 ----------
+        Send("^ ")                          ; ⏺ 開始
+        Sleep RecordSec * 1000
+        Send("^ ")                          ; ⏹ 停止
+
+        ; ---------- 3) 全選 → 複製 ----------
+        Sleep 500
+        Send("^a")
+        Sleep 200
+        Send("^l")                              ; Biopac Copy 熱鍵
+        Sleep 500
+        if (A_Clipboard = "")
+            throw Error("剪貼簿為空，可能複製失敗")
+
+        ; ---------- 4) Notepad 開指定檔 → 全刪貼上 ----------
+        Run(Format('notepad.exe "{}"', TargetFile))
+        if !WinWaitActive(TxtTitle " - Notepad",,5)
+            throw Error("未能在 5 秒內開啟 " TargetFile)
+
+        Sleep 300
+        Send("^a{Del}")                         ; 清空
+        Sleep 150
+        Send("^v")                              ; 貼上
+        Sleep 300
+        Send("^s")                              ; 存檔
+        Sleep 300
+        WinClose("A")                           ; 關閉目前 Notepad
+
+        MsgBox("流程完成 ✅ 已將資料寫入 " TargetFile)
+    } ; catch e {
+      ;   MsgBox("⚠️ 發生錯誤: " e.Message)
+   ;  }
+}
